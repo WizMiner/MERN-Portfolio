@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  fullName: { type: String, required: true }, // changed 'name' to 'fullName'
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, default: "user", enum: ["admin", "user"] }, // Default to regular user
