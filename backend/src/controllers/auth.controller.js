@@ -1,113 +1,112 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import { generateToken } from "../lib/utils.js";
 import User from "../models/user.model.js";
+import bcrypt from "bcryptjs";
 
-// Utility function to generate a JWT token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" }); // Token valid for 7 days
-};
-
-// Signup Controller
+// Signup
 export const signup = async (req, res) => {
   const { fullName, email, password } = req.body;
 
   try {
-    // Validate required fields
+    // Validate the provided input fields
     if (!fullName || !email || !password) {
-      return res.status(400).json({ message: "All fields are required." });
+      return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Check password length
+    // Validate the password length
     if (password.length < 6) {
       return res
         .status(400)
-        .json({ message: "Password must be at least 6 characters long." });
+        .json({ message: "Password must be at least 6 characters" });
     }
 
-    // Check if email is already registered
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email is already in use." });
+    // Check if a user with the given email already exists
+    const user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: "Email already exists" });
     }
 
-    // Hash the password
+    // Generate salt and hash the password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create new user
-    const newUser = await User.create({
+    // Create a new User instance
+    const newUser = new User({
       fullName,
       email,
       password: hashedPassword,
     });
 
-    // Generate JWT token
-    const token = generateToken(newUser._id);
+    if (newUser) {
+      // Generate a JWT token for the new user
+      generateToken(newUser._id, res);
+      // Save the new user to the database
+      await newUser.save();
 
-    // Respond with user data and token
-    res.status(201).json({
-      user: {
+      // Return the newly created user in JSON format
+      res.status(201).json({
         _id: newUser._id,
         fullName: newUser.fullName,
         email: newUser.email,
-        profilePic: newUser.profilePic || null,
-      },
-      token,
-    });
+        profilePic: newUser.profilePic,
+      });
+    } else {
+      // Handle case where new user data is invalid
+      res.status(400).json({ message: "Invalid user data" });
+    }
   } catch (error) {
-    console.error("Error in signup controller:", error.message);
-    res.status(500).json({ message: "Internal server error." });
+    // Log any errors and return a 500 status with an "Internal Server Error" message
+    console.log("Error in signup controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-// Login Controller
+// Login
 export const login = async (req, res) => {
   const { email, password } = req.body;
-
   try {
-    // Validate required fields
-    if (!email || !password) {
-      return res.status(400).json({ message: "All fields are required." });
-    }
-
-    // Find the user by email
+    // Check if the user exists
     const user = await User.findOne({ email });
+
     if (!user) {
-      return res.status(404).json({ message: "User not found." });
+      // If the user does not exist, return an error
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Compare passwords
-    const isPasswordMatch = await bcrypt.compare(password, user.password);
-    if (!isPasswordMatch) {
-      return res.status(400).json({ message: "Invalid credentials." });
+    // Check if the password is correct
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
+      // If the password is incorrect, return an error
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Generate JWT token
-    const token = generateToken(user._id);
+    // Generate a JWT token for the user
+    generateToken(user._id, res);
 
-    // Respond with user data and token
+    // Return the logged in user in JSON format
     res.status(200).json({
-      user: {
-        _id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        profilePic: user.profilePic || null,
-      },
-      token,
+      _id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      profilePic: user.profilePic,
     });
   } catch (error) {
-    console.error("Error in login controller:", error.message);
-    res.status(500).json({ message: "Internal server error." });
+    // If there is an error, log it and return a 500 error
+    console.log("Error in login controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-// Logout Controller
+// Logout
 export const logout = (req, res) => {
   try {
-    // Clear the token on client-side (client must remove token)
-    res.status(200).json({ message: "Logged out successfully." });
+    // Clear the JWT cookie
+    res.cookie("jwt", "", { maxAge: 0 });
+
+    // Return a 200 status with a "Logged out successfully" message
+    res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
-    console.error("Error in logout controller:", error.message);
-    res.status(500).json({ message: "Internal server error." });
+    // Log any errors and return a 500 status with an "Internal Server Error" message
+    console.log("Error in logout controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
