@@ -1,10 +1,18 @@
+import dotenv from "dotenv";
 import express from "express";
-const app = express();
-const port = process.env.PORT ?? 3000;
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
+import authRoutes from "./routes/auth.route.js";
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT;
+
+// Middleware to parse JSON
+app.use(express.json());
+
+// Routes
+app.use("/api/auth", authRoutes);
+
+app.listen(PORT, () => {
+  console.log(`Server is running on PORT: ${PORT}`);
 });
